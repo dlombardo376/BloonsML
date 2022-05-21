@@ -8,18 +8,18 @@ import pandas as pd
 import numpy as np
 
 class QTable():
-    def __init__(self,buffer,num_rounds=41,alpha=0.1,decay=0.9):
+    def __init__(self,buffer,num_rounds=41,alpha=0.1,decay=0.99):
         self.qtable = pd.DataFrame(columns=buffer.monkeys, index=range(41)).fillna(0)
         self.alpha = alpha
+        self.decay = decay
 
 
     def update(self,buffer):
         num_rewards = len(buffer.rewards)
         reward_decay = np.zeros(num_rewards)
-        decay = 0.99
         next_reward = 0
         for n,r in enumerate(buffer.rewards[::-1]):
-            reward_decay[num_rewards-n-1] = r + decay * next_reward
+            reward_decay[num_rewards-n-1] = r + self.decay * next_reward
             next_reward = reward_decay[num_rewards-n-1]
 
         for i in range(len(reward_decay)):
@@ -28,10 +28,12 @@ class QTable():
 
 
     def predict(self,round_num):
-        choices = self.qtable.loc[round_num][self.qtable.loc[round_num] == self.qtable.loc[round_num].max()].index
+        t = self.qtable.loc[round_num]
+        maxval = t[t != 0].max()
+        choices = t[t == maxval].index
         return choices
 
 
-    def save(self):
-        pd.to_pickle(self,"bloon_model.pkl")
+    def save(self, filepath):
+        pd.to_pickle(self,filepath)
     
