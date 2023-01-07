@@ -9,7 +9,7 @@ import numpy as np
 
 class QTable():
     def __init__(self,buffer,num_rounds=41,alpha=0.1,decay=0.99):
-        self.qtable = pd.DataFrame(columns=buffer.monkeys, index=range(41)).fillna(0)
+        self.qtable = pd.DataFrame(columns=buffer.monkeys, index=range(num_rounds)).fillna(0)
         self.alpha = alpha
         self.decay = decay
 
