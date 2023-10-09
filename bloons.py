@@ -44,6 +44,7 @@ restart_button = np.load(r"C:\Users\Daniel\PycharmProjects\BloonsML\restart_arr.
 # np.save(r"C:\Users\Daniel\PycharmProjects\BloonsML\victory_arr.npy",victory_button)
 victory_button = np.load(r"C:\Users\Daniel\PycharmProjects\BloonsML\victory_arr.npy")
 
+heart_im = np.load(r"C:\Users\Daniel\PycharmProjects\BloonsML\heart_arr.npy")
 
 def click_upgrade(monkey_spots):
     monkey_key = np.random.randint(0, len(monkey_spots))
@@ -97,39 +98,34 @@ def place_monkey_by_key(key, loc_choice):
         return 0, (-1, -1)
     #    print(key, len(game_grid))
     # select the monkey on screen
+
+    # start_money = get_money()
+
     time.sleep(0.25)
     bloon_input.press_key(key)
     time.sleep(0.25)  # between 0.3 and 0.5 should be good
     bloon_input.release_key(key)
 
-    # try locations till it works, or we get "tired"
-    #    num_tries = 1
-    #    nudge_dist = 15
-    start_money = get_money()
-    #    for i in range(num_tries):
-    # before placing monkeys again, check one more time for end game screen
-    #        done = check_game_status()
-    #        if done > 0 or len(game_grid) < 1:
-    #            break
-
-    #        x = np.random.uniform(250,1600,1)[0]
-    #        y = np.random.uniform(250,1000,1)[0]
     xm = loc_choice[0]
     ym = loc_choice[1]
     xM = loc_choice[2]
     yM = loc_choice[3]
-    #        game_grid.pop(choice)
     for i in range(25):  # try moving randomly around the block
         x_n = np.random.randint(xm, xM)
         y_n = np.random.randint(ym, yM)
         pyautogui.moveTo(x_n, y_n)
         pyautogui.click()
+        time.sleep(0.5)  # between 0.3 and 0.5 should be good
 
         # check if money changed, indicating successful placement
-        new_money = get_money()
-        print("start money", start_money)
-        print("new money", new_money)
-        if new_money != start_money:
+        # new_money = get_money()
+        im1 = np.array(pyautogui.screenshot())
+        # fig,ax = plt.subplots(2)
+        # ax[0].imshow(heart_im)
+        # ax[1].imshow(im1[20: 55, 78: 123])
+        # plt.show()
+        if (im1[20: 55, 78: 123] == heart_im).sum() > 0.96 * heart_im.shape[0] * heart_im.shape[1] * heart_im.shape[2]:
+        # if new_money != start_money and len(new_money) > 0:
             return 1, (x_n, y_n)
 
             # failed placement, reset
@@ -276,7 +272,7 @@ def game_loop(model_file=None, should_save=True):
     # epsilon = 0.1
     # call_upgrade_model_thresh = 0.5
     explore_thresh = 0.1
-    loc_explore_thresh = 0.2
+    loc_explore_thresh = 1.0
 
     loc_model = bloon_loc_model.LocQTable(buffer)
 
@@ -302,11 +298,11 @@ def game_loop(model_file=None, should_save=True):
             money_str = get_money()
             if len(money_str) > 0:
                 money = int(money_str)
-            print("money", money)
+            # print("money", money)
             # get all monkeys that are affordable right now
             e = np.random.uniform(0, 1)
             options = prices.get_affordable(money)
-            options += ['upgrade_' + m for m in monkey_spots.keys()]  # add possible upgrade monkeys
+            # options += ['upgrade_' + m for m in monkey_spots.keys()]  # add possible upgrade monkeys
             if e > explore_thresh:
                 model_options = model.predict(j)
                 # print("model prediction used")
@@ -349,7 +345,6 @@ def game_loop(model_file=None, should_save=True):
             #                    print("monkey added ")
             #                else:
             #                    print("monkey not added ")
-            raise ValueError("debug")
 
             # end round
             # always try to read the money :)
@@ -398,8 +393,8 @@ def game_loop(model_file=None, should_save=True):
     return did_win, model, buffer, loc_model
 
 
-should_save = False
-success, model, buffer = game_loop(should_save=should_save)
+should_save = True
+success, model, buffer, loc_model = game_loop(should_save=should_save)
 # success, model, buffer, loc_model = game_loop("./bloon_model.pkl", should_save=should_save)
 
 if success == True and should_save == True:

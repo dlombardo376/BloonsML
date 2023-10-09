@@ -23,7 +23,7 @@ class QTable():
             next_reward = reward_decay[num_rewards-n-1]
 
         for i in range(len(reward_decay)):
-            old_reward = self.qtable.loc[i,buffer.action_ls[i]]
+            old_reward = self.qtable.loc[i, buffer.action_ls[i]]
             self.qtable.loc[i,buffer.action_ls[i]] += self.alpha * (reward_decay[i] - old_reward)
 
 
