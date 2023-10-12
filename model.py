@@ -7,14 +7,14 @@ Created on Mon Feb 28 22:54:43 2022
 import pandas as pd
 import numpy as np
 
-class QTable():
-    def __init__(self,buffer,num_rounds=41,alpha=0.1,decay=0.99):
+
+class QTable:
+    def __init__(self, buffer, num_rounds=41, alpha=0.1, decay=0.99):
         self.qtable = pd.DataFrame(columns=buffer.monkeys, index=range(num_rounds)).fillna(0)
         self.alpha = alpha
         self.decay = decay
 
-
-    def update(self,buffer):
+    def update(self, buffer):
         num_rewards = len(buffer.rewards)
         reward_decay = np.zeros(num_rewards)
         next_reward = 0
@@ -26,14 +26,12 @@ class QTable():
             old_reward = self.qtable.loc[i, buffer.action_ls[i]]
             self.qtable.loc[i,buffer.action_ls[i]] += self.alpha * (reward_decay[i] - old_reward)
 
-
-    def predict(self,round_num):
+    def predict(self, round_num):
         t = self.qtable.loc[round_num]
         maxval = t[t != 0].max()
         choices = t[t == maxval].index
         return choices
 
-
     def save(self, filepath):
-        pd.to_pickle(self,filepath)
+        pd.to_pickle(self, filepath)
     
