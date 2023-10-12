@@ -115,7 +115,10 @@ def place_monkey_by_key(key, loc_choice):
         x_n = np.random.randint(xm, xM)
         y_n = np.random.randint(ym, yM)
         pyautogui.moveTo(x_n, y_n)
-        pyautogui.click()
+        if i == 0:
+            pyautogui.click()
+        else:
+            pyautogui.mouseUp()
         time.sleep(0.25)  # between 0.3 and 0.5 should be good
 
         # check if money changed, indicating successful placement
@@ -138,6 +141,7 @@ def place_monkey_by_key(key, loc_choice):
         # bloon_input.release_key(key)
         pyautogui.mouseDown()
 
+    pyautogui.mouseUp()
     return 0, (-1, -1)
 
 
@@ -224,7 +228,8 @@ def hit_play():
     global IS_FIRST_ROUND
     done = 0
     # print("start round")
-    pyautogui.moveTo(1850, 1050)
+    pyautogui.moveTo(1850, 1010)
+    time.sleep(1.0)
     pyautogui.click()
     if IS_FIRST_ROUND:
         time.sleep(0.2)
@@ -307,7 +312,7 @@ def game_loop(model_file=None, should_save=True):
         monkey_spots = {}  # key by monkey name, list of all locations
 
         for j in range(41):
-            print("round", j)
+            print("round", j+1)
             money_str = get_money()
             if len(money_str) > 0:
                 money = int(money_str)
