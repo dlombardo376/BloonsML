@@ -5,7 +5,6 @@ Works with full screen
 import pyautogui
 import time
 import numpy as np
-from PIL import Image
 import matplotlib.pyplot as plt
 import pytesseract
 import cv2
@@ -21,30 +20,25 @@ import pathfinder as bloon_paths
 tess_config = "--psm 7"
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract'
 
+# coordinates in hd, modify to get 2k
+# 2k res is 1440 x 2560
+# hd res is 1080 x 1920
+res_mod = (2560/1920, 1440/1080)
+
 # dart monkey location
-dart_x = 1850
-dart_y = 250
+dart_x = 1850 * res_mod[0]
+dart_y = 250 * res_mod[1]
 
 # round start
 IS_FIRST_ROUND = True  # double click first time to set fast-forward
 GRID_SPACING = 40
-# play_button = Image.open(r"C:\Users\Daniel\PycharmProjects\BloonsML\bloon_play.png")
-# play_button = np.array(play_button)
-# np.save(r"C:\Users\Daniel\PycharmProjects\BloonsML\play_arr.npy", play_button)
+
 play_button = np.load(r"C:\Users\Daniel\PycharmProjects\BloonsML\play_arr.npy")
 play_clean_button = np.load(r"C:\Users\Daniel\PycharmProjects\BloonsML\play_clean_arr.npy")
-
-# restart_button = Image.open(r"C:\Users\Daniel\PycharmProjects\BloonsML\bloon_restart.png")
-# restart_button = np.array(restart_button)
-# np.save(r"C:\Users\Daniel\PycharmProjects\BloonsML\restart_arr.npy", restart_button)
 restart_button = np.load(r"C:\Users\Daniel\PycharmProjects\BloonsML\restart_arr.npy")
-
-# victory_button = Image.open(r"C:\Users\Daniel\PycharmProjects\BloonsML\bloon_victory.png")
-# victory_button = np.array(victory_button)
-# np.save(r"C:\Users\Daniel\PycharmProjects\BloonsML\victory_arr.npy",victory_button)
 victory_button = np.load(r"C:\Users\Daniel\PycharmProjects\BloonsML\victory_arr.npy")
-
 xplace_im = np.load(r"C:\Users\Daniel\PycharmProjects\BloonsML\xplace_arr.npy")
+
 
 def click_upgrade(monkey_spots):
     monkey_key = np.random.randint(0, len(monkey_spots))
@@ -57,7 +51,7 @@ def click_upgrade(monkey_spots):
     attempted = []
     while len(attempted) < len(choices):
         # move onto the upgrade screen
-        pyautogui.moveTo(x, y)
+        pyautogui.moveTo(x * res_mod[0], y * res_mod[1])
         pyautogui.click()
         time.sleep(0.25)
 
@@ -114,31 +108,24 @@ def place_monkey_by_key(key, loc_choice):
     for i in range(25):  # try moving randomly around the block
         x_n = np.random.randint(xm, xM)
         y_n = np.random.randint(ym, yM)
-        pyautogui.moveTo(x_n, y_n)
+        pyautogui.moveTo(x_n * res_mod[0], y_n * res_mod[1])
         if i == 0:
             pyautogui.click()
         else:
             pyautogui.mouseUp()
         time.sleep(0.25)  # between 0.3 and 0.5 should be good
 
-        # check if money changed, indicating successful placement
-        # new_money = get_money()
-        im1 = np.array(pyautogui.screenshot())
-        # print((im1[95:140, 1575:1625] == xplace_im).sum() < 0.96 * xplace_im.shape[0] * xplace_im.shape[1] * xplace_im.shape[2])
-        # fig,ax = plt.subplots(2)
-        # ax[0].imshow(xplace_im)
-        # ax[1].imshow(im1[95:140,1575:1625])
-        # plt.show()
+        im1 = pyautogui.screenshot()
+        im1 = im1.resize((1920, 1080))
+        im1 = np.array(im1)
+        print(im1.shape)
         if (im1[95:140, 1575:1625] == xplace_im).sum() < 0.96 * xplace_im.shape[0] * xplace_im.shape[1] * xplace_im.shape[2]:
-        # if new_money != start_money and len(new_money) > 0:
-            return 1, (x_n, y_n)
-
-            # failed placement, reset
-        # pyautogui.moveTo(dart_x, dart_y)
-        # pyautogui.moveTo(x_n, y_n)
-        # bloon_input.press_key(key)
-        # time.sleep(0.25)  # between 0.3 and 0.5 should be good
-        # bloon_input.release_key(key)
+            # np.save("debug.npy", im1[95:140, 1575:1625])
+            # fig,ax=plt.subplots(1,2)
+            # ax[0].imshow(im1[95:140, 1575:1625])
+            # ax[1].imshow(xplace_im)
+            # plt.show()
+            return 1, (x_n * res_mod[0], y_n * res_mod[1])
         pyautogui.mouseDown()
 
     pyautogui.mouseUp()
@@ -146,10 +133,10 @@ def place_monkey_by_key(key, loc_choice):
 
 
 def restart_game():
-    pyautogui.moveTo(830, 830)
+    pyautogui.moveTo(830*res_mod[0], 830*res_mod[1])
     pyautogui.click()
     time.sleep(0.25)
-    pyautogui.moveTo(1150, 760)
+    pyautogui.moveTo(1150*res_mod[0], 760*res_mod[1])
     pyautogui.click()
     time.sleep(0.25)
 
@@ -161,6 +148,7 @@ def get_lives():
         try:
             im1 = pyautogui.screenshot()
             #    im2 = im1.crop((123,53,205,96)).convert('L')
+            im1 = im1.resize((1920, 1080))
             im2 = im1.crop((118, 25, 200, 68)).convert('L')
             im2 = im2.resize((400, 200))
             ret, im3 = cv2.threshold(np.array(im2), 240, 255, cv2.THRESH_BINARY)
@@ -173,7 +161,7 @@ def get_lives():
             print("failed to read lives")
             # plt.imshow(im3)
             # plt.show()
-            pyautogui.moveTo(35, 35)
+            pyautogui.moveTo(50, 50)
             pyautogui.click()
             tries += 1
     return ''
@@ -187,6 +175,7 @@ def get_money():
     while (len(money_str) < 1) and (try_index < 10):
         # start_x = 348 + try_index
         # im2 = im1.crop((352,50,450,95)).convert('L')
+        im1 = im1.resize((1920, 1080))
         im2 = im1.crop((365, 25, 465, 70)).convert('L')
         im2 = im2.resize((400, 200))
         ret, im3 = cv2.threshold(np.array(im2), 240, 255, cv2.THRESH_BINARY)
@@ -202,16 +191,16 @@ def get_money():
 
 def check_game_status():
     im1 = pyautogui.screenshot()
+    im1 = im1.resize((1920, 1080))
     im2 = im1.crop((1792, 969, 1792 + 90, 969 + 50))
     im2 = np.array(im2)
-    end_im = im1.crop((787, 733, 787 + 121, 733 + 126))
+    end_im = im1.crop((795, 760, 795 + 110, 760 + 100))
     end_im = np.array(end_im)
     win_im = im1.crop((709, 139, 709 + 532, 139 + 85))
     win_im = np.array(win_im)
-    # fig,ax = plt.subplots(2)
-    # ax[0].imshow(end_im)
-    # ax[1].imshow(restart_button)
+    # plt.imshow(im2)
     # plt.show()
+    # np.save("play_clean_arr.npy", im2)
     if (end_im == restart_button).sum() > 0.96 * (end_im.shape[0] * end_im.shape[1] * end_im.shape[2]):
         return 1
     elif (win_im == victory_button).sum() > 0.96 * (win_im.shape[0] * win_im.shape[1] * win_im.shape[2]):
@@ -228,7 +217,7 @@ def hit_play():
     global IS_FIRST_ROUND
     done = 0
     # print("start round")
-    pyautogui.moveTo(1850, 1010)
+    pyautogui.moveTo(1850*res_mod[0], 1010*res_mod[1])
     time.sleep(1.0)
     pyautogui.click()
     if IS_FIRST_ROUND:
@@ -256,8 +245,8 @@ def hit_play():
 
 
 def make_grid(spacing=30):
-    x_space = list(range(150, 1600, spacing))
-    y_space = list(range(150, 1000, spacing))
+    x_space = list(range(150, int(1600 * res_mod[0]), spacing))
+    y_space = list(range(150, int(1000 * res_mod[1]), spacing))
     grid = []
     for x in x_space:
         for y in y_space:
@@ -290,7 +279,7 @@ def game_loop(model_file=None, should_save=True):
     epsilon = 0.66
     # call_upgrade_model_thresh = 0.5
     explore_thresh = 0.99
-    loc_explore_thresh = 1.0
+    loc_explore_thresh = 0.99
 
     loc_model = bloon_loc_model.LocQTable(buffer)
 
@@ -399,12 +388,14 @@ def game_loop(model_file=None, should_save=True):
         #        ax.scatter([x for x,y in game_grid], [y for x,y in game_grid])
         #        plt.show()
 
-        explore_thresh = explore_thresh * epsilon
+        explore_thresh = max(0.1, explore_thresh * epsilon)
+        loc_explore_thresh = max(0.1, loc_explore_thresh * epsilon)
         model.update(buffer)
         loc_model.update(buffer)
         if should_save:
             buffer.save("./bloon_buffer_temp.pkl")
             model.save("./bloon_model_tmp.pkl")
+            loc_model.save("./bloon_loc_model_tmp.pkl")
         restart_game()
     return did_win, model, buffer, loc_model
 
