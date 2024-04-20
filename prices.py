@@ -34,6 +34,33 @@ def get_base_prices():
     }
 
 
+def get_size():
+    return {
+        'dart': 's',
+        'boomerang': 's',
+        'cannon': 's',
+        'spike': 's',
+        'frozen': 's',
+        'glue': 's',
+        'sniper': 's',
+        'sub': 'l',
+        'pirate': 'l',
+        'plane': 'l',
+        'heli': 'l',
+        'mortar': 'l',
+        'gatling': 's',
+        'magic': 's',
+        'super': 'l',
+        'ninja': 's',
+        'alchemist': 's',
+        'druid': 's',
+        'banana': 'l',
+        'factory': 's',
+        'village': 'l',
+        'engineer': 's',
+        'none': None
+    }
+
 def get_key_for_monkey(monkey):
     hotkeys = {
         'dart': 0x10,

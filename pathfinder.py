@@ -6,6 +6,7 @@ Created on Sat Apr 30 19:14:08 2022
 """
 
 from skimage import measure
+from skimage.feature import match_template
 import numpy as np
 
 def preprocess_image(bloon_map):
@@ -29,10 +30,24 @@ def find_contours(bloon_map, min_length=500):
     return np.concatenate(long_cons)
 
 
+def find_contours_by_reds(image_ls: list):
+
+    assert len(image_ls) > 0
+    template = np.load("bloon_template.npy")
+    contour_ls = []
+    for im in image_ls:
+        result = match_template(np.array(im), template)
+        contours = measure.find_contours((result > np.max(result) * 0.9)[:, :, 0])
+        contour_ls.append(np.concatenate(contours))
+    return np.concatenate(contour_ls)
+
+
 def find_viable_squares(contours, grid_options):
     path_options = []
     for g in grid_options:
-        d = np.sqrt((np.power(contours[:,1] + 100 - g[0], 2) + np.power(contours[:, 0] + 100 - g[1], 2))).min()
+        # for each point in the grid, check distance to the contours
+        d = np.sqrt((np.power(contours[:, 1] + 100 - g[0], 2) + np.power(contours[:, 0] + 100 - g[1], 2))).min()
         if 20 < d < 80:
             path_options.append(g)
+
     return path_options

@@ -6,6 +6,9 @@ based on work in this question:
 @author: Danny
 """
 
+# scan code key fields:
+# https://www.win.tue.nl/~aeb/linux/kbd/scancodes-10.html#scancodesets
+
 import os
 import ctypes
 import win32api

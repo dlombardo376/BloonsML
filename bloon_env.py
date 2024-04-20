@@ -3,12 +3,14 @@ import numpy as np
 import pyautogui
 import time
 import cv2
+import pandas as pd
 
 import inputs as bloon_input
+import pathfinder as bloon_pathfinder
 
 
 class BloonEnv():
-    def __init__(self):
+    def __init__(self, map_name: str = None):
         # tesseract
         self.tess_config = "--psm 7"
         pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract'
@@ -25,6 +27,17 @@ class BloonEnv():
         # round start
         self.is_first_round = True  # double click first time to set fast-forward
         self.grid_spacing = 40
+
+        # get promising locations for monkey placement using image contrast
+        self.base_grid = self.make_grid(spacing=int(30 * self.res_mod[0]))
+        self.trajectory_images = []  # for updating the contours mid-game, when we have more info on bloons.
+        if map_name is not None:
+            try:
+                self.path_options = list(np.load(f"path_{map_name}_valid.npy"))
+            except:
+                self.path_options = pd.read_pickle(f"path_{map_name}.pkl")
+        else:
+            self.path_options = self.find_placement_grid_by_image_contrast()
 
         self.play_button = np.load(r"C:\Users\Daniel\PycharmProjects\BloonsML\play_arr.npy")
         self.play_clean_button = np.load(r"C:\Users\Daniel\PycharmProjects\BloonsML\play_clean_arr.npy")
@@ -53,7 +66,7 @@ class BloonEnv():
         else:
             return screenshot.resize((1920, 1080))
 
-    def place_monkey_by_key(self, key, loc_choice):
+    def place_monkey_by_key(self, key, loc_choice, num_tries=25, add_noise=True):
         # 250x250 to 1600x1000 is usable space
         if key == -1:
             return 0, (-1, -1)
@@ -68,14 +81,18 @@ class BloonEnv():
         time.sleep(0.25)  # between 0.3 and 0.5 should be good
         bloon_input.release_key(key)
 
-        xm = loc_choice[0]
-        ym = loc_choice[1]
-        xM = loc_choice[2]
-        yM = loc_choice[3]
-        for i in range(25):  # try moving randomly around the block
-            x_n = np.random.randint(xm, xM)
-            y_n = np.random.randint(ym, yM)
-            pyautogui.moveTo(x_n * self.res_mod[0], y_n * self.res_mod[1])
+        xm = loc_choice[0] * 0.9
+        ym = loc_choice[1] * 0.9
+        xM = loc_choice[0] * 1.1
+        yM = loc_choice[1] * 1.1
+        for i in range(num_tries):  # try moving randomly around the block
+            if add_noise:
+                x_n = np.random.randint(xm, xM)
+                y_n = np.random.randint(ym, yM)
+            else:
+                x_n = loc_choice[0]
+                y_n = loc_choice[1]
+            pyautogui.moveTo(x_n, y_n)
             if i == 0:
                 pyautogui.click()
             else:
@@ -84,7 +101,6 @@ class BloonEnv():
 
             im1 = self.take_screenshot(force_hd=True)
             im1 = np.array(im1)
-            print(im1.shape)
             if (im1[95:140, 1575:1625] == self.xplace_im).sum() \
                     < 0.96 * self.xplace_im.shape[0] * self.xplace_im.shape[1] * self.xplace_im.shape[2]:
                 # np.save("debug.npy", im1[95:140, 1575:1625])
@@ -92,10 +108,15 @@ class BloonEnv():
                 # ax[0].imshow(im1[95:140, 1575:1625])
                 # ax[1].imshow(xplace_im)
                 # plt.show()
-                return 1, (x_n * self.res_mod[0], y_n * self.res_mod[1])
+                # print("found placement", x_n, y_n)
+                return 1, (x_n, y_n)
             pyautogui.mouseDown()
 
+        # if nothing was find, lift up the mouse, and wipe the screen
         pyautogui.mouseUp()
+        pyautogui.moveTo(1850 * self.res_mod[0], 1010 * self.res_mod[1])
+        time.sleep(0.5)
+
         return 0, (-1, -1)
 
     def get_money(self):
@@ -123,17 +144,20 @@ class BloonEnv():
         tries = 0
         while tries < 10:
             try:
-                im1 = im1 = self.take_screenshot(force_hd=True)
-                im2 = im1.crop((118, 25, 200, 68)).convert('L')
+                im1 = self.take_screenshot(force_hd=True)
+                im2 = im1.crop((138, 25, 220, 68)).convert('L')
                 im2 = im2.resize((400, 200))
                 ret, im3 = cv2.threshold(np.array(im2), 240, 255, cv2.THRESH_BINARY)
                 im3 = 255 - im3
                 life_str = pytesseract.image_to_string(im3, config=self.tess_config)
                 life_str = ''.join([s for s in life_str if s in ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']])
+                if len(life_str) > 3:
+                    # max lives is usually 200. Should never have more than 1000
+                    life_str = life_str[:3]
                 assert len(life_str) > 0
                 return life_str
             except Exception as e:
-                print("failed to read lives")
+                # print("failed to read lives")
                 # plt.imshow(im3)
                 # plt.show()
                 self.clean_click()
@@ -161,14 +185,14 @@ class BloonEnv():
         while wait_index < 1e4:
             wait_index += 1
             done = self.check_game_status()
+            if make_trajectory:
+                self.trajectory_images.append(self.take_screenshot(force_hd=False))
+            time.sleep(1.0)
             if done >= 0:
-                break
+                pyautogui.click()
+                return done
 
-        pyautogui.click()  # just keep clicking in case other crap shows up on the screen
-        if wait_index < 1e4:
-            return done
-        else:
-            raise ValueError("Got tired of waiting :(")
+        raise ValueError("Got tired of waiting...stopping the round.")
 
     def check_game_status(self):
         im1 = self.take_screenshot(force_hd=True)
@@ -225,3 +249,30 @@ class BloonEnv():
 
         self.clean_click(0.5)
         return 0
+
+    def make_grid(self, spacing=30):
+        x_space = list(range(150, int(1600 * self.res_mod[0]), spacing))
+        y_space = list(range(150, int(1000 * self.res_mod[1]), spacing))
+        grid = []
+        for x in x_space:
+            for y in y_space:
+                grid.append((x, y))
+        return grid
+
+    def find_placement_grid_by_image_contrast(self, inplace=False):
+        # get the whole map, then locate where the path is
+        orig_map = self.take_screenshot(force_hd=False)
+        bloon_map = bloon_pathfinder.preprocess_image(orig_map)
+
+        contours = bloon_pathfinder.find_contours(bloon_map)
+        path_options = bloon_pathfinder.find_viable_squares(contours, self.base_grid)
+        if inplace:
+            self.path_options = path_options
+        return path_options
+
+    def find_placement_grid_by_trajectories(self, inplace=False):
+        contours = bloon_pathfinder.find_contours_by_reds(image_ls=self.trajectory_images)
+        path_options = bloon_pathfinder.find_viable_squares(contours, self.base_grid)
+        if inplace:
+            self.path_options = path_options
+        return path_options

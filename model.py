@@ -18,13 +18,13 @@ class QTable:
         num_rewards = len(buffer.rewards)
         reward_decay = np.zeros(num_rewards)
         next_reward = 0
-        for n,r in enumerate(buffer.rewards[::-1]):
+        for n, r in enumerate(buffer.rewards[::-1]):
             reward_decay[num_rewards-n-1] = r + self.decay * next_reward
             next_reward = reward_decay[num_rewards-n-1]
 
         for i in range(len(reward_decay)):
             old_reward = self.qtable.loc[i, buffer.action_ls[i]]
-            self.qtable.loc[i,buffer.action_ls[i]] += self.alpha * (reward_decay[i] - old_reward)
+            self.qtable.loc[i, buffer.action_ls[i]] += self.alpha * (reward_decay[i] - old_reward)
 
     def predict(self, round_num):
         t = self.qtable.loc[round_num]
