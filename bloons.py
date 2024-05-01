@@ -15,8 +15,7 @@ from bloon_env import BloonEnv
 import pyautogui
 import inputs as bloon_input
 
-
-def master_loop(num_games=1, randomize=False, model_file=None):
+def master_loop(num_games=1, randomize=False, model_file=None,explore_thresh=0.99):
     pyautogui.moveTo(300, 300)
     time.sleep(1.0)
     pyautogui.click()
@@ -38,6 +37,8 @@ def master_loop(num_games=1, randomize=False, model_file=None):
         "town",
         # "one_two_three"
     ]
+
+    track_ls=[]
     for i in range(num_games):
         if randomize:
             game_idx = np.random.choice(len(starter_clicks))
@@ -78,11 +79,19 @@ def master_loop(num_games=1, randomize=False, model_file=None):
         # trajectory_loop(map_name=names[game_idx])
         success, model, buffer = game_loop(should_save=True,
                                            map_name=names[game_idx],
-                                           model_file=model_file
+                                           model_file=model_file,
+                                           explore_thresh=explore_thresh
                                            )
 
+        track_ls.append({
+            "success": success,
+            "reward": sum(buffer.rewards),
+            "map": names[game_idx],
+            "num_rounds": len(buffer.rewards),
+            "explore_thresh": explore_thresh
+        })
         # End the game, success or fail
-        if success:
+        if success == 1:
             pyautogui.moveTo(1290, 1215)
             pyautogui.click()
             time.sleep(0.5)
@@ -90,12 +99,12 @@ def master_loop(num_games=1, randomize=False, model_file=None):
             pyautogui.moveTo(945, 1130)
             pyautogui.click()
             time.sleep(2.5)
-        elif not success:
+        elif success == 0:
             # print("going through defeat reset")
-            pyautogui.moveTo(1130, 1080)
+            pyautogui.moveTo(830, 1080)
             pyautogui.click()
             time.sleep(2.5)
-        else: # placeholder condition for trajectory building commands
+        elif success == -1:
             # Press escape
             bloon_input.press_key(0x01)
             time.sleep(0.25)
@@ -106,6 +115,19 @@ def master_loop(num_games=1, randomize=False, model_file=None):
             pyautogui.moveTo(1140, 1120)
             pyautogui.click()
             time.sleep(2.5)
+        else:
+            # placeholder condition for trajectory building commands
+            # Press escape
+            bloon_input.press_key(0x01)
+            time.sleep(0.25)
+            bloon_input.release_key(0x01)
+            time.sleep(0.25)
+
+            # Return home
+            pyautogui.moveTo(1140, 1120)
+            pyautogui.click()
+            time.sleep(2.5)
+    return track_ls
 
 
 def choose_monkey(options):
@@ -129,7 +151,7 @@ def trajectory_loop(map_name:str):
     return 0
 
 
-def game_loop(model_file=None, should_save=True, map_name=None):
+def game_loop(model_file=None, should_save=True, map_name=None, explore_thresh=0.99):
     # make game the active window
     env = BloonEnv(map_name)
     env.clean_click()
@@ -139,7 +161,6 @@ def game_loop(model_file=None, should_save=True, map_name=None):
     did_win = False
     epsilon = 0.66
     # call_upgrade_model_thresh = 0.5
-    explore_thresh = 0.99
     # loc_explore_thresh = 0.99
 
     # loc_model = bloon_loc_model.LocQTable(buffer)
@@ -150,7 +171,8 @@ def game_loop(model_file=None, should_save=True, map_name=None):
     else:
         model = bloon_model.QTable(buffer, num_rounds=41)
 
-    for epoch in range(1):  # number of times to try winning
+    num_games = 1
+    for epoch in range(num_games):  # number of times to try winning
         if did_win:
             break
         start_lives = int(env.get_lives())
@@ -159,6 +181,7 @@ def game_loop(model_file=None, should_save=True, map_name=None):
         buffer.reset()
         monkey_spots = {}  # key by monkey name, list of all locations
 
+        placement_coords = []
         for j in range(41):
             # print("round", j+1)
             money_str = env.get_money()
@@ -205,9 +228,14 @@ def game_loop(model_file=None, should_save=True, map_name=None):
                         add_noise=False
                     )
                     if success:
+                        placement_coords.append(loc_choice)
                         break
-                    elif prices.get_size()[monkey_choice] == 's':
-                        env.path_options.pop(loc_idx_choice)
+                    # elif loc_choice not in placement_coords and prices.get_size()[monkey_choice] == 's':
+                    #     env.path_options.pop(loc_idx_choice)
+                    if len(env.path_options) < 40:
+                        np.save(f"bad_path_{map_name}_valid.npy", env.path_options)
+                        print("WARNING: not enough path options")
+                        return -1, model, buffer
 
                 # keep track of where we've placed monkeys
                 if success == 1:
@@ -227,11 +255,11 @@ def game_loop(model_file=None, should_save=True, map_name=None):
 
             done = env.hit_play()
 
-            if done > 0:
-                im1 = env.take_screenshot(force_hd=True)
-                im2 = np.array(im1)
-                hash = time.time()
-                np.save(f"end_screen_{hash}.npy", im2)
+            # if done > 0:
+                # im1 = env.take_screenshot(force_hd=True)
+                # im2 = np.array(im1)
+                # hash = time.time()
+                # np.save(f"end_screen_{hash}.npy", im2)
             if done == 1:
                 # lost all remaining lives this round
                 buffer.add(action=monkey_choice, reward=-start_lives, is_done=done, loc_action=loc_idx_choice)
@@ -251,8 +279,9 @@ def game_loop(model_file=None, should_save=True, map_name=None):
                     if num_lives > start_lives:
                         print(f"WARNING: num lives too large: {num_lives}. Start: {start_lives}. Setting to 1 less")
                         num_lives = start_lives - 1
-                assert num_lives <= start_lives
-                assert num_lives >= 0
+                if num_lives > start_lives or num_lives < 0:
+                    print("WARNING: num lives does not make sense. Exiting.")
+                    return -1, model, buffer
                 reward = num_lives - start_lives
                 start_lives = num_lives
 
@@ -267,7 +296,6 @@ def game_loop(model_file=None, should_save=True, map_name=None):
         #        ax.scatter([x for x,y in game_grid], [y for x,y in game_grid])
         #        plt.show()
 
-        explore_thresh = max(0.1, explore_thresh * epsilon)
         # loc_explore_thresh = max(0.1, loc_explore_thresh * epsilon)
         model.update(buffer)
         # loc_model.update(buffer)
@@ -276,16 +304,26 @@ def game_loop(model_file=None, should_save=True, map_name=None):
             model.save("./bloon_model_tmp.pkl")
             np.save(f"path_{map_name}_valid.npy", env.path_options)
             # loc_model.save("./bloon_loc_model_tmp.pkl")
-        env.restart_game()
-    return did_win, model, buffer#, loc_model
+
+        if epoch < num_games - 1:
+            # we are playing again :)
+            env.restart_game()
+    return did_win, model, buffer #,loc_model
 
 
-master_loop(1, randomize=True, model_file=None)
-master_loop(49, randomize=True, model_file="bloon_model_tmp.pkl")
-# should_save = True
-# success, model, buffer = game_loop(should_save=should_save, map_name="middle_road")
-# # success, model, buffer, loc_model = game_loop("./bloon_model.pkl", should_save=should_save)
-#
+explore_thresh = 0.99
+track_ls = master_loop(1, randomize=True, model_file=None, explore_thresh=explore_thresh)
+explore_thresh = 0.5
+for i in range(34):
+    track_ls += master_loop(1, randomize=True, model_file="bloon_model_tmp.pkl", explore_thresh=explore_thresh)
+    pd.DataFrame(track_ls).to_csv("results_qlearn_temp.csv", index=False)
+explore_thresh = 0.1
+for i in range(15):
+    track_ls += master_loop(1, randomize=True, model_file="bloon_model_tmp.pkl", explore_thresh=explore_thresh)
+    pd.DataFrame(track_ls).to_csv("results_qlearn_temp.csv", index=False)
+
+pd.DataFrame(track_ls).to_csv("results_qlearn_20240427.csv", index=False)
+
 # if success and should_save:
 #     buffer.save("./bloon_buffer.pkl")
 #     model.save("./bloon_model.pkl")
