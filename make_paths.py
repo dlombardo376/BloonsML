@@ -15,7 +15,7 @@ from bloon_env import BloonEnv
 import pyautogui
 import inputs as bloon_input
 
-def master_loop():
+def master_loop(skip_maps=0):
     pyautogui.moveTo(300, 300)
     time.sleep(1.0)
     pyautogui.click()
@@ -29,24 +29,53 @@ def master_loop():
         (1800, 750),
     ]
 
+    forward_click = (2189, 574)
+
     names = [
         "meadow",
         "loop",
         "middle_road",
         "tree",
         "town",
-        "one_two_three"
+        "one_two_three",
+        "scrapyard",
+        "cabin",
+        "resort",
+        "skates",
+        "lotus_island",
+        "candy_falls",
+        "winter_park",
+        "carved",
+        "park_path",
+        "alpine",
+        "frozen_over",
+        "cubism",
+        "four_circles",
+        "hedge",
+        "end_of_road",
+        "logs"
     ]
-    for i in range(len(starter_clicks)):
+    for i in range(22):
+        if i < skip_maps:
+            continue
+
         # start game
         time.sleep(0.5)
         pyautogui.moveTo(1110, 1250)
         pyautogui.click()
         time.sleep(0.5)
 
+        # if necessary, move to next page
+        pages = i // 6
+        while pages > 0:
+            pyautogui.moveTo(forward_click[0], forward_click[1])
+            pyautogui.click()
+            time.sleep(0.5)
+            pages -= 1
+
         # select the map
-        startx = starter_clicks[i][0]
-        starty = starter_clicks[i][1]
+        startx = starter_clicks[i % 6][0]
+        starty = starter_clicks[i % 6][1]
         time.sleep(0.5)
         pyautogui.moveTo(startx, starty)
         pyautogui.click()
@@ -114,4 +143,4 @@ def game_loop(map_name:str):
     return 0
 
 
-master_loop()
+master_loop(skip_maps=6)

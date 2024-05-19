@@ -26,7 +26,7 @@ class BloonEnv():
 
         # round start
         self.is_first_round = True  # double click first time to set fast-forward
-        self.grid_spacing = 40
+        self.grid_spacing = 3  # size of the squares in the location grid. Used for choosing placement location.
 
         # get promising locations for monkey placement using image contrast
         self.base_grid = self.make_grid(spacing=int(30 * self.res_mod[0]))
@@ -97,12 +97,15 @@ class BloonEnv():
                 pyautogui.click()
             else:
                 pyautogui.mouseUp()
-            time.sleep(0.25)  # between 0.3 and 0.5 should be good
+            time.sleep(0.35)  # between 0.3 and 0.5 should be good
 
             im1 = self.take_screenshot(force_hd=True)
             im1 = np.array(im1)
-            if (im1[95:140, 1575:1625] == self.xplace_im).sum() \
-                    < 0.96 * self.xplace_im.shape[0] * self.xplace_im.shape[1] * self.xplace_im.shape[2]:
+
+            im_size = self.xplace_im.shape[0] * self.xplace_im.shape[1]
+            test_channel = (im1[95:140, 1575:1625][:,:,0] > 240)
+            target_channel = (self.xplace_im[:,:,0] > 240)
+            if (test_channel == target_channel).sum() < 0.96 * im_size:
                 # np.save("debug.npy", im1[95:140, 1575:1625])
                 # fig,ax=plt.subplots(1,2)
                 # ax[0].imshow(im1[95:140, 1575:1625])
@@ -258,6 +261,37 @@ class BloonEnv():
             for y in y_space:
                 grid.append((x, y))
         return grid
+
+    def get_grid_box_options(self, box_idx, options):
+
+        # using the grid_spacing, define the x/y boundaries of each box.
+        xrange = np.linspace(options[:, 0].min(), options[:, 0].max(), self.grid_spacing + 1)
+        yrange = np.linspace(options[:, 1].min(), options[:, 1].max(), self.grid_spacing + 1)
+
+        # use the chosen id to find which box we are placing a tower in.
+        x_idx = box_idx % self.grid_spacing
+        y_idx = box_idx // self.grid_spacing
+
+        # get the bounds of the chosen box.
+        x_max = xrange[x_idx + 1]
+        x_min = xrange[x_idx]
+        y_max = yrange[y_idx + 1]
+        y_min = yrange[y_idx]
+
+        # if the chosen box is on the right edge, include the upper bound.
+        if x_idx + 1 == len(xrange) - 1:
+            x_max += 1
+        if y_idx + 1 == len(yrange) - 1:
+            y_max += 1
+
+        # get all location options in the chosen grid.
+        grid_options = options[
+            (options[:, 0] >= x_min) &
+            (options[:, 1] >= y_min) &
+            (options[:, 0] < x_max) &
+            (options[:, 1] < y_max)
+            ]
+        return grid_options
 
     def find_placement_grid_by_image_contrast(self, inplace=False):
         # get the whole map, then locate where the path is
