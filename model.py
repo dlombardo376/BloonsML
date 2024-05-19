@@ -9,10 +9,15 @@ import numpy as np
 
 
 class QTable:
-    def __init__(self, buffer, num_rounds=41, alpha=0.1, decay=0.99):
-        self.qtable = pd.DataFrame(columns=buffer.monkeys, index=range(num_rounds)).fillna(0)
+    def __init__(self, buffer, num_rounds=41, alpha=0.1, decay=0.99, num_grid=9):
+        cols = []
+        for monkey in buffer.monkeys:
+            for i in range(num_grid):
+                cols.append(f"{monkey}_{i}")
+        self.qtable = pd.DataFrame(columns=cols, index=range(num_rounds)).fillna(0)
         self.alpha = alpha
         self.decay = decay
+        self.num_grid = num_grid
 
     def update(self, buffer):
         num_rewards = len(buffer.rewards)
